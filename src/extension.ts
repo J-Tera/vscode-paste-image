@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import {spawn} from 'child_process';
 import * as moment from 'moment';
+import * as crypto from 'crypto';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "vscode-paste-image" is now active!');
@@ -62,7 +63,8 @@ class Paster {
 
                 editor.edit(edit => {
                     let current = editor.selection;
-                    
+
+                    imagePath = imagePath.replace(/\\/g, '/');
                     if(current.isEmpty){
                         edit.insert(current.start,imagePath);
                     }else{
@@ -76,16 +78,22 @@ class Paster {
         });
     }
 
-    public static getImagePath(filePath:string, selectText:string, folderPathFromConfig:string): string {
-        // image file name
-        let imageFileName = "";
-        if (! selectText) {
-            imageFileName = moment().format("Y-MM-DD-HH-mm-ss") + ".png";
-        } else {
-            imageFileName = selectText + ".png";
+    public static getImagePath(filePath: string, selectText: string, folderPathFromConfig: string): string {
+        let imagePath = this.buildPathStr(filePath, selectText, folderPathFromConfig);
+        while (fs.existsSync(imagePath)) {
+            imagePath = this.buildPathStr(filePath, selectText, folderPathFromConfig);
         }
+        return imagePath;
+    }
 
+    private static buildPathStr(filePath: string, selectText: string, folderPathFromConfig: string): any {
+        // image file name
+        let imageFileName = this.getImageFileName(selectText);
         // image output path
+        return this.joinImageNameWithFilePath(filePath, imageFileName, folderPathFromConfig);
+    }
+
+    private static joinImageNameWithFilePath(filePath: string, imageFileName: string, folderPathFromConfig: string): string {
         let folderPath = path.dirname(filePath);
         let imagePath = "";
 
@@ -97,6 +105,19 @@ class Paster {
         }
 
         return imagePath;
+    }
+
+    private static getImageFileName(selectText: string): string{
+        let imageFileName = "";
+        if (! selectText) {
+            let curFilePath = vscode.window.activeTextEditor.document.fileName;
+            let fileNameEndIndex = curFilePath.lastIndexOf('.') == -1 ? curFilePath.length : curFilePath.lastIndexOf('.');
+            let curFileName = curFilePath.substring(curFilePath.lastIndexOf(path.sep) + 1, fileNameEndIndex);
+            imageFileName = curFileName + path.sep + crypto.randomBytes(4).toString('hex') + ".png";
+        } else {
+            imageFileName = selectText + ".png";
+        }
+        return imageFileName;
     }
 
     /**
